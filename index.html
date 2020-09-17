@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Hello World</title>
+    <script src="https://unpkg.com/react@16/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@16/umd/react-dom.development.js"></script>
+    
+    <!-- Don't use this in production: -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="text/babel">
+      const REST_URL = "http://data.bioontology.org";
+      const API_KEY = "d24ff278-4d54-4abe-8d70-5967e43d49db";
+      const humanAnnotationsExample = "https://docs.google.com/spreadsheets/d/15gCDp593QcdZMWgaxdmefp0hrWI1XmxjZoDIweKO4TA";
+      const searchEndpointFor = (term) => {
+        return (REST_URL + "/search?q=" + encodeURI(term));
+      }
+
+      class Index extends React.Component {
+        render() {
+          return (
+            <div>
+              <h1>
+                Demo: Bio Ontology Helper
+              </h1>
+              <p>
+                Sometimes Kepler misses a biomedical Entity in a text. <br/>
+                When it does, a human in the loop might want to manually annotate the missing entity. <br/>
+                That process currently requires, for each unannotated string/missing entity, that the human in question:
+              </p>
+              <ol>
+                <li>enters the unannotated string into a seperate search engine</li>
+                <li>selects one or more search hits with site navigation and copy/paste</li>
+                <li>captures the ontology, unique identifier, and link out to 1+ selected entities in a seperate table <a href={humanAnnotationsExample} target="_blank">like this one</a></li>
+              </ol>
+              <p>
+                The input below demos how to use the BioOntology API to populate a list of suggested entities and their ontologies, automating away the more obnoxious and time-consuming part of the work.
+              </p>
+              <BioOntologySearch />
+            </div>
+          );
+        }
+      }
+
+      class BioOntologySearch extends React.Component {
+        constructor(props) {
+          super(props);
+          this.state = {
+            searchTerm: "",
+            isLoading: false,
+            error: null,
+            searchHits: null
+          };
+          this.handleChange = this.handleChange.bind(this);
+          this.handleSubmit = this.handleSubmit.bind(this);
+        }
+
+        handleSubmit(event) {
+          event.preventDefault();
+
+          this.setState({isLoading: true});
+
+          fetch(
+            searchEndpointFor(this.state.searchTerm),
+            {headers: {"Authorization": `apikey token=${API_KEY}`}}
+          )
+          .then(
+            res => res.json()
+          )
+          .then(
+            (result) => {
+              console.log(result);
+              this.setState({
+                isLoading: false,
+                searchHits: result.collection
+              });
+            },
+            (error) => {
+              this.setState({
+                isLoading: true,
+                error
+              });
+            }
+          )
+        }
+
+        handleChange(event) {
+          this.setState({searchTerm: event.target.value});
+        }
+
+        render() {
+          if (this.state.error) {
+            return (
+              <div>Error: { this.state.error.message }</div>
+            )
+          } else if (this.state.isLoading) {
+            return (
+              <div>loading...</div>
+            )
+          } else if (this.state.searchHits) {
+            return (
+              <div>
+                BioOntology Search Results:
+                <table>
+                  <thead>
+                    <tr>
+                      <th>prefLabel</th>
+                      <th>definition</th>
+                      <th>synonym</th>
+                      <th>@id</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {this.state.searchHits.map( (hit, index) => {
+                      return (
+                        <tr key={index}>
+                          <td key={ `text_${index}` }>
+                            { hit["prefLabel"] }
+                          </td>
+                          <td key={ "definition" + index }>
+                            { hit["definition"] }
+                          </td>
+                          <td key={ "synonym_" + index }>
+                            { hit["synonym"] }
+                          </td>
+                          <td key={ "id_" + index }>
+                            { hit["@id"] }
+                          </td>
+                        </tr>
+                      )
+                    } )}
+                  </tbody>
+                </table>
+              </div>
+            )
+          } else {
+            return (
+              <form onSubmit={this.handleSubmit}>
+                <label>
+                  Search: <input type="text" value={this.state.searchTerm} onChange={this.handleChange} name="search" />
+                </label>
+                <br/>
+                <br/>
+                <input type="submit" value="Submit" />
+              </form>
+            )
+          }
+        }
+      }
+
+      ReactDOM.render(
+        <Index />,
+        document.getElementById('root')
+      );
+
+    </script>
+    <!--
+      Note: slowly compiling JSX with Babel in the browser is not suitable for production.
+    -->
+  </body>
+</html>
